@@ -1,0 +1,69 @@
+---
+title: "Final Project Data Memo"
+author: "Victor Zhang"
+date: "2023-01-19"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+
+### An overview of dataset
+
+
+I will combine two datasets from Kaggle one has the number of positive and negative reviews a product has, which can be used as a proxy indicator for approximately how many units have been sold of said product, and another one has genre tags and the number of votes for each tag for each game. Both datasets contain the App ID, the ID of the product allocated by Steam, so that I can merge two datasets. 
+
+Both datasets are from Kaggle.
+The first one is called Steam Games and DLCs Dataset:
+https://www.kaggle.com/datasets/mikekzan/steam-games-dlcs?select=steamspy_tag_data.csv
+
+The second one is called All 55,000 Games on Steam (November 2022):
+https://www.kaggle.com/datasets/tristan581/all-55000-games-on-steam-november-2022
+ 
+There are over 55000 observations and over 20 predictors in both datasets, which is a lot.
+However, I will rank all observations in the dataset that contains the number of positive and negative reviews by the total number of reviews, and select the top 600, middle 600, and last 600 observations to work on. At the same time, I will also merge the tags data from another dataset by App Id. The number of reviews is a numerical value that wouldn't be hard to work on, but the tags data is categorical and I will delete the tags that none of the 1800 observation uses since there are over 400 tags.
+
+There might be some missing data, but so far I haven't seen one. If after cleaning my data I find some observations have missing data, I would just delete them because I would still have around 1500 observations to work on.
+
+
+### An overview of research question(s)
+
+
+I am interested in predicting the relationship between the number of sales of a game and its genres or tags.
+I am also interested in answering the question of whether a new PC game will attract people to buy it, which many game developers care about.
+The response variable would be the total number of reviews because it can be used as an indicator of the number of sales of a game.
+I think a classification approach might be the best since the tags data is categorical.
+The tags that describe the core or basic genres of a game might be especially useful since any game is built around certain key genres.
+The goal of my model is predictive since I expect it to predict the sales of a new PC game.
+
+
+
+
+### Proposed project timeline
+
+
+I will load, merge, and clean the data during the weekend of week 2 (this week).
+During the week 3, I will start doing EDA.
+If possible, I will start modeling by using what I have learned from the lecture.
+If everything goes well, I will keep modelling and try to get some results at the end of the week 4.
+However, If something is wrong at that time, I will ask for help and hope to catch up before week 6.
+If everything goes as planned, I should finish everything before week 8, wrap up during week 9, and turn in my final project in week 10.
+
+
+
+### Any questions or concerns
+
+The games that don't have a good sale might only have a few tags on them (or no tags), which might be useless. 
+Should I only include the top and average selling games in my dataset because they would have some votes for different tags?
+Should I create a categorical variable for response variable that has value 1 for good selling and value 0 for bad selling based on some researches?
+
+
+
