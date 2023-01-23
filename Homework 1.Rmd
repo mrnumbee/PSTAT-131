@@ -1,8 +1,12 @@
 ---
 title: "Homework 1"
 author: "Victor Zhang"
-date: "2023-01-23"
-output: html_document
+date: "2023-01-22"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
 ---
 
 ```{r setup, include=FALSE}
