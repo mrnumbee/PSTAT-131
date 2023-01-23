@@ -1,0 +1,184 @@
+---
+title: "Homework 1"
+author: "Victor Zhang"
+date: "2023-01-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+
+## Machine Learning Main Ideas
+
+## Question 1:
+
+
+Supervised learning is a type of statistical learning that for each observation of the predictor x there will be an associated response y from actual data.
+
+Unsupervised learning is a type of statistical learning that for each observation of the predictor x there will not be an associated response y. 
+
+The difference is that supervised learning needs observed output and input while unsupervised learning only needs observed input.
+
+
+## Question 2:
+
+For the regression model, the response y is quantitative or associated with numerical values like price, blood pressure, and speed.
+
+For the classification model, the response y is qualitative or associated with Categorical values like survived/died, spam/not spam, and scratch/don’t scratch.
+
+Also, the common error metrics for regression models are Mean squared error, Root mean squared error, Mean absolute error, and R-squared. At the same time, the common error metrics for the classification models are Accuracy, Error rate, Precision, and Area under the ROC curve, which function similarly to the regression ones but with different names.
+
+------from the lecture
+
+## Question 3:
+For regression ML problems, two commonly used metrics are Mean squared error and Root mean squared error.
+
+For classification ML problems, two commonly used metrics are Accuracy and Error rate.
+
+------from the lecture
+
+## Question 4:
+
+Descriptive models: Choose model to best visually emphasize a trend in data, like using a line on a scatterplot.
+
+Inferential models: Find what features are significant. Aim is to test theories and possible causal claims. State relationship between outcome & predictor(s).
+
+Predictive models: Find what combo of features fits best. Aim is to predict Y
+with minimum reducible error. Not focused on hypothesis tests.
+
+------from the lecture
+
+
+## Question 5:
+
+
+Mechanistic means parametric, and it assumes there is a parametric form for f or x1,x2,x3.... Also, it won’t match true unknown f and can add parameters, which makes it flexible. Empirically-driven means non-parametric, and it makes no assumptions about f. Also, it requires a large number of observations. Since it makes no assumptions about f, empirically-driven is much more flexible by default. They are different in the sense that mechanistic makes an assumption about the parametric form for f while empirically-driven makes no such assumption at all. They are similar in the sense that their flexibility might cause overfitting.
+
+
+In my opinion, the mechanistic might be easier to understand since its less flexibility would give it a relatively high interpretability. Also, it has an assumption about the f that we can use directly, like a linear relationship.
+
+
+The bias-variance tradeoff suggests that a simple (not very flexible) model would have high bias and low variance while a flexible model would have low bias and high variance. In general, as we use more flexible methods, the variance will increase and the bias will decrease. Thus, if we use mechanistic models, we know that the models would have high bias and low variance due to the bias-variance tradeoff. If we use empirically-driven models, we know that the models would have low bias and high variance. 
+
+------from the lecture
+
+
+## Question 6:
+
+---Given a voter’s profile/data, how likely is it that they will vote in favor of the candidate?
+
+This question is predictive since it tries to predict a future event, and it doesn't focused on any hypothesis test.
+
+
+---How would a voter’s likelihood of support for the candidate change if they had personal contact with the candidate?
+
+This question is inferential since it tries to test the theory that a voter's personal contact with a candidate would change his or her supports for the candidate. 
+
+
+## Exploratory Data Analysis
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ggplot2)
+library(corrplot)
+library(ggthemes)
+tidymodels_prefer()
+
+```
+
+
+```{r, eval = TRUE}
+mpg
+```
+## Exercise 1:
+
+```{r}
+mpg %>% 
+  ggplot(aes(x = hwy)) +
+  geom_histogram(bins = 30) +
+  theme_bw()
+
+```
+
+
+According to the histogram, most cars have a highway miles per gallon that are lower than 30. Also, the data looks like skewing to the right.
+
+
+## Exercise 2:
+
+```{r}
+mpg %>% 
+  ggplot(aes(x = hwy, y = cty )) +
+  geom_point() + 
+  theme_bw()
+
+```
+
+
+I notice that the cty increases at a relatively constant rate as hwy increases
+constantly, which indicates that there might be a positive linear relationship between cty and hwy.
+
+## Exercise 3:
+
+```{r}
+mpg %>% 
+  ggplot( aes(y=reorder(manufacturer,manufacturer,function(y)-length(y))))  +
+  geom_bar() +
+  theme_bw() +
+  labs(x = "Count", y = "manufacturer")
+
+```
+
+
+Dodge produced the most cars, lincoin produced the least.
+
+
+## Exercise 4:
+
+```{r}
+mpg %>% 
+  ggplot(aes(x = as.factor(cyl), y = hwy)) +
+  geom_boxplot() + 
+  geom_jitter(alpha=0.5) +
+  theme_bw() + 
+  labs(x = "cyl", y = "hwy")
+
+```
+
+
+I notice that the hwy decreases at a relatively constant rate as cyl increases
+constantly, which indicates that there might be a negative linear relationship between cyl and hwy.
+
+
+
+## Exercise 5:
+
+```{r}
+mpg %>% 
+  select(is.numeric) %>% 
+  cor() %>% 
+  corrplot(type = 'lower', diag = TRUE, 
+           method = 'number')
+
+```
+
+displ/cyl and hwy/cty are positively correlated.
+
+cty/displ, cty/cyl, hwy/displ, and hwy/cyl are negatively correlated.
+
+
+Yes, they make sense because more cylinders will cause more engine displacement. Also, highway miles per gallon and city miles per gallon should have some relationship since both of them are data from the same engine. Besides that, it also makes sense that higher city miles per gallon will have a lower engine displacement since the occasional stopping and braking will create an inefficient use of the engine, which results in low engine displacement.
+
+
+
+
+
+
+
+
+
+
