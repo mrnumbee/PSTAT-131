@@ -1,0 +1,247 @@
+---
+title: "Homework 2"
+author: "Victor Zhang"
+date: "2023-02-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ggplot2)
+library(corrplot)
+library(ggthemes)
+library(kableExtra)
+tidymodels_prefer()
+
+```
+
+
+```{r}
+abalone = read.csv('/Users/victo/Desktop/hw2/data/abalone.csv')
+head(abalone)
+```
+
+
+## Question 1:
+
+```{r}
+
+abalone_new <- abalone %>%
+  mutate(age = rings + 1.5) %>% 
+  select(age, rings, everything())
+
+head(abalone_new)
+```
+
+
+
+
+```{r}
+
+abalone_new %>% 
+  ggplot(aes(x = age)) +
+  geom_histogram() +
+  theme_bw()
+
+```
+
+
+According to the histogram, the distribution of age looks like a normal distribution that is skewed to the right.
+
+## Question 2:
+```{r}
+set.seed(2333)
+
+abalone_split <- initial_split(abalone_new, prop = 0.80, strata = age)
+abalone_train <- training(abalone_split)
+abalone_test <- testing(abalone_split)
+
+
+```
+
+
+## Question 3:
+
+```{r}
+abalone_train_1 <- abalone_train[-2]
+head(abalone_train_1)
+
+abalone_test_1 <- abalone_test[-2]
+head(abalone_test_1)
+
+```
+
+```{r}
+abalone_recipe <- recipe(age ~ ., data = abalone_train_1) %>% 
+  step_dummy(all_nominal_predictors())   %>% 
+  step_interact(terms = ~ starts_with("type"):shucked_weight) %>% 
+  step_interact(terms = ~ longest_shell:diameter) %>% 
+  step_interact(terms = ~ shucked_weight:shell_weight) %>% 
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors())
+
+
+abalone_recipe
+
+
+```
+```{r}
+prep(abalone_recipe) %>% 
+  bake(new_data = abalone_train_1) %>% 
+  head() %>% 
+  kable() %>% 
+  kable_styling(full_width = F) %>% 
+  scroll_box(width = "100%", height = "200px")
+
+
+```
+
+
+We shouldn't use the rings variable to predict the age variable because we use the rings variable to create the age variable. If we use the rings variable to predict, we will violate the exogeneity assumption.
+
+
+## Question 4:
+```{r}
+
+lm_model <- linear_reg() %>% 
+  set_engine("lm")
+
+```
+
+
+## Question 5:
+```{r}
+
+library(kknn)
+
+knn_model <- nearest_neighbor(neighbors = 7) %>% 
+  set_engine("kknn") %>% 
+  set_mode("regression")
+
+```
+
+
+## Question 6:
+
+
+```{r}
+lm_wflow <- workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(abalone_recipe)
+
+lm_fit <- fit(lm_wflow, abalone_train_1)
+
+```
+
+
+
+
+```{r}
+knn_wflow <- workflow() %>% 
+  add_model(knn_model) %>% 
+  add_recipe(abalone_recipe)
+
+knn_fit <- fit(knn_wflow, abalone_train_1)
+
+```
+
+
+## Question 7:
+
+```{r}
+
+hypothetical_abalone <- data.frame(age = 0, type = 'F' , longest_shell = 0.50, diameter = 0.10, height = 0.30, whole_weight = 4, shucked_weight = 1, viscera_weight = 2, shell_weight = 1)
+
+abalone_train_pre <- predict(lm_fit, new_data = hypothetical_abalone %>% select(-age) )
+
+abalone_train_pre
+
+```
+
+
+## Question 8:
+
+```{r}
+abalone_metrics_lm <- metric_set(rmse, rsq, mae)
+
+abalone_test_res <- predict(lm_fit, new_data = abalone_test_1 %>% select(-age) )
+abalone_test_res <- bind_cols(abalone_test_res, abalone_test_1 %>% select(age))
+
+abalone_metrics_lm(abalone_test_res, truth = age, 
+                estimate = .pred)
+
+```
+
+We have RMSE = 2.1372479, $R^{2}$ = 0.5745184, and MAE = 1.5266642.
+
+$R^{2}$ refers to the proportion of the variability in response that can be explained using predictors. A number of 0.5745184 indicates that our linear regression model has a roughly 55% accuracy on predicting, 
+
+
+
+```{r}
+
+abalone_metrics_knn <- metric_set(rmse, rsq, mae)
+
+abalone_test_knn <- predict(knn_fit, new_data = abalone_test_1 %>% select(-age) )
+abalone_test_knn <- bind_cols(abalone_test_knn, abalone_test_1 %>% select(age))
+
+abalone_metrics_knn(abalone_test_knn, truth = age, 
+                estimate = .pred)
+```
+
+We have RMSE = 2.3252360, $R^{2}$ = 0.5000039, and MAE = 1.6476974
+
+$R^{2}$ refers to the proportion of the variability in response that can be explained using predictors. A number of 0.5000039 indicates that our linear regression model has a roughly 50% accuracy on predicting, 
+
+
+
+## Question 9:
+
+The linear regression model performed better on the test data. One reason might be that the method of K-nearest neighbors has a limitation that it would fail then the number of parameters is very large. When the number of parameters is very large, there are very few data points in the neighbors, which directly affects the model accuracy.
+
+I am kind of surprised by my result because I thought K-nearest neighbors would fit the data better due to its flexibility.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
