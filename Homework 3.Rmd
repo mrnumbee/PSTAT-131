@@ -239,10 +239,7 @@ titanic_log_roc <- augment(titaniclog_fit, new_data = titanic_train)
 
 
 titanic_log_roc %>% 
-  roc_curve(survived, .pred_Yes) %>%
-  autoplot()
-
-
+  roc_auc(survived, .pred_Yes) 
 
 ```
 
@@ -259,8 +256,7 @@ titanic_lda_roc <- augment(titaniclda_fit, new_data = titanic_train)
 
 
 titanic_lda_roc %>% 
-  roc_curve(survived, .pred_Yes) %>%
-  autoplot()
+  roc_auc(survived, .pred_Yes) 
 
 
 ```
@@ -281,8 +277,7 @@ titanic_qda_roc <- augment(titanicqda_fit, new_data = titanic_train)
 
 
 titanic_qda_roc %>% 
-  roc_curve(survived, .pred_Yes) %>%
-  autoplot()
+  roc_auc(survived, .pred_Yes) 
 
 
 
@@ -301,8 +296,8 @@ titanic_kbb_roc <- augment(titanicknn_fit, new_data = titanic_train)
 
 
 titanic_kbb_roc %>% 
-  roc_curve(survived, .pred_Yes) %>%
-  autoplot()
+  roc_auc(survived, .pred_Yes) 
+
 
 ```
 
