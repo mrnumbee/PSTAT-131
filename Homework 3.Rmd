@@ -1,0 +1,392 @@
+---
+title: "Homework 3"
+author: "Victor Zhang"
+date: "2023-02-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ggplot2)
+library(corrplot)
+library(ggthemes)
+library(kableExtra)
+tidymodels_prefer()
+
+library(discrim)
+library(poissonreg)
+library(corrr)
+library(corrplot)
+library(klaR) 
+```
+
+
+```{r}
+titanic = read.csv('/Users/victo/Desktop/New folder/data/titanic.csv')
+head(titanic)
+
+```
+
+
+
+```{r}
+
+titanic$survived <- factor(titanic$survived, levels = c("Yes","No"))
+titanic$pclass<- as.factor(titanic$pclass)
+
+
+head(titanic)
+
+is.factor(titanic$survived)
+is.factor(titanic$pclass)
+levels(titanic$survived)
+
+```
+
+
+## Question 1
+
+```{r}
+set.seed(2333)
+
+titanic_split <- initial_split(titanic, prop = 0.7,
+                                strata = survived)
+
+titanic_split
+
+titanic_train <- training(titanic_split)
+titanic_test <- testing(titanic_split)
+
+head(titanic_train)
+```
+
+Stratified sampling is good because it ensures the splitted data can properly present the population, and we won't have extreme splitted data that none of the observation is survived
+
+
+## Question 2
+```{r}
+
+titanic_train %>% 
+  ggplot(aes(x = survived)) +
+    geom_bar()
+
+titanic_train %>% 
+  select(survived) %>% 
+  table()
+
+titanic_train %>% 
+  select(sex) %>% 
+  table()
+
+titanic_train %>% 
+  select(pclass) %>% 
+  table()
+```
+
+```{r}
+
+ggplot(titanic_train, aes(fill = sex, x=survived) ) + 
+    geom_bar(position="fill")
+
+ggplot(titanic_train, aes(fill = pclass, x=survived) ) + 
+    geom_bar(position="fill")
+```
+
+
+The distribution of the outcome variable survived is unbalanced.
+
+Sex will be a good predictor of the outcome because it strongly indicates which sex will survive.
+
+Passenger class won't be a good predictor of the outcome because it has no strong indication about whether the second class will survive.  
+
+In the percent stacked bar chart, the percentage of each subgroup is showed, which allows us to study the evolution of their proportion in the whole.
+
+
+## Question 3
+
+```{r}
+
+titanic_train %>% 
+  select(is.numeric) %>% 
+  cor() %>% 
+  corrplot(type = 'lower', diag = TRUE, 
+           method = 'number')
+
+cor_titanic_train <- titanic_train %>%
+  select(is.numeric) %>%
+  correlate()
+rplot(cor_titanic_train)
+
+
+
+titanic_train %>% 
+  summarise(mean(age))
+```
+
+
+Age is negatively correlated with the number of siblings / spouses aboard the Titanic.
+
+The number of of siblings / spouses aboard the Titanic is positively correlated with the number of parents / children aboard the Titanic. 
+
+Age is also slightly negatively correlated with the number of parents / children aboard the Titanic.
+
+The number of parents / children aboard the Titanic is also slightly positively correlated with the Passenger fare.
+
+
+
+## Question 4
+```{r}
+
+titanic_recipe <- recipe(survived ~ pclass + sex + age + sib_sp + parch + fare, data = titanic_train) %>% 
+  step_impute_linear(age, impute_with = imp_vars(pclass, sex, sib_sp, parch, fare)) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_interact(terms = ~ starts_with("sex"):fare) %>% 
+  step_interact(terms = ~ age:fare)
+
+
+titanic_recipe
+
+prep(titanic_recipe) %>% 
+  bake(new_data = titanic_train) %>% 
+  head() %>% 
+  kable() %>% 
+  kable_styling(full_width = F) %>% 
+  scroll_box(width = "100%", height = "200px")
+
+
+```
+
+
+## Question 5
+```{r}
+log_reg <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+
+titaniclog_wkflow <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(titanic_recipe)
+
+titaniclog_fit <- fit(titaniclog_wkflow, titanic_train)
+
+```
+
+
+## Question 6
+```{r}
+lda_mod <- discrim_linear() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+titaniclda_wkflow <- workflow() %>% 
+  add_model(lda_mod) %>% 
+  add_recipe(titanic_recipe)
+
+titaniclda_fit <- fit(titaniclda_wkflow, titanic_train)
+
+```
+
+
+## Question 7
+
+```{r}
+
+qda_mod <- discrim_quad() %>% 
+  set_mode("classification") %>% 
+  set_engine("MASS")
+
+titanicqda_wkflow <- workflow() %>% 
+  add_model(qda_mod) %>% 
+  add_recipe(titanic_recipe)
+
+titanicqda_fit <- fit(titanicqda_wkflow, titanic_train)
+
+
+```
+
+## Question 8
+
+```{r}
+
+knn_model <- nearest_neighbor(neighbors = 5) %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+
+titanicknn_wflow <- workflow() %>% 
+  add_model(knn_model) %>% 
+  add_recipe(titanic_recipe)
+
+titanicknn_fit <- fit(titanicknn_wflow, titanic_train)
+
+```
+
+## Question 9
+```{r}
+
+titanic_log_res <- predict(titaniclog_fit, new_data = titanic_train %>% select(-survived))
+titanic_log_res <- bind_cols(titanic_log_res, titanic_train %>% select(survived))
+
+titanic_log_roc <- augment(titaniclog_fit, new_data = titanic_train)
+
+
+titanic_log_roc %>% 
+  roc_curve(survived, .pred_Yes) %>%
+  autoplot()
+
+
+
+```
+
+
+
+
+```{r}
+
+titanic_lda_res <- predict(titaniclda_fit, new_data = titanic_train %>% select(-survived))
+titanic_lda_res <- bind_cols(titanic_lda_res, titanic_train %>% select(survived))
+
+
+titanic_lda_roc <- augment(titaniclda_fit, new_data = titanic_train)
+
+
+titanic_lda_roc %>% 
+  roc_curve(survived, .pred_Yes) %>%
+  autoplot()
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+titanic_qda_res <- predict(titanicqda_fit, new_data = titanic_train %>% select(-survived))
+titanic_qda_res <- bind_cols(titanic_qda_res, titanic_train %>% select(survived))
+
+
+titanic_qda_roc <- augment(titanicqda_fit, new_data = titanic_train)
+
+
+titanic_qda_roc %>% 
+  roc_curve(survived, .pred_Yes) %>%
+  autoplot()
+
+
+
+```
+
+
+
+```{r}
+
+titanic_knn_res <- predict(titanicknn_fit, new_data = titanic_train %>% select(-survived))
+titanic_knn_res <- bind_cols(titanic_knn_res, titanic_train %>% select(survived))
+
+
+
+titanic_kbb_roc <- augment(titanicknn_fit, new_data = titanic_train)
+
+
+titanic_kbb_roc %>% 
+  roc_curve(survived, .pred_Yes) %>%
+  autoplot()
+
+```
+
+
+
+## Question 10
+
+```{r}
+
+titaniclog_fit_test <- fit(titaniclog_wkflow, titanic_test)
+log_test <- augment(titaniclog_fit_test, new_data = titanic_test)
+log_test %>% 
+  roc_auc(survived, .pred_Yes)
+
+
+titaniclda_fit_test  <- fit(titaniclda_wkflow, titanic_test)
+lda_test <- augment(titaniclda_fit_test, new_data = titanic_test)
+lda_test %>% 
+  roc_auc(survived, .pred_Yes)
+
+
+titanicqda_fit_test  <- fit(titanicqda_wkflow, titanic_test)
+qda_test <- augment(titanicqda_fit_test, new_data = titanic_test)
+qda_test %>% 
+  roc_auc(survived, .pred_Yes)
+
+
+titanicknn_fit_test  <- fit(titanicknn_wflow, titanic_test)
+knn_test <- augment(titanicknn_fit_test, new_data = titanic_test)
+knn_test %>% 
+  roc_auc(survived, .pred_Yes)
+
+```
+
+
+Logistic regression has an AUC of 0.8343042.
+
+LDA has an AUC of 0.8333628.
+
+QDA has an AUC of 0.831068.
+
+Knn has an AUC of 0.9926449.
+
+The knn model achieved the highest AUC on the testing data.
+
+
+
+
+```{r}
+
+knn_test %>% 
+  conf_mat(truth = survived, estimate = .pred_class) %>% 
+  autoplot(type = "heatmap")
+
+
+knn_test %>% 
+  roc_curve(survived, .pred_Yes) %>%
+  autoplot()
+
+
+```
+
+
+
+```{r}
+
+titanic_kbb_roc %>% 
+  roc_auc(survived, .pred_Yes)
+
+
+knn_test %>% 
+  roc_auc(survived, .pred_Yes)
+
+
+```
+
+
+My best model which is Knn model perform better on the testing dataset. I think the reason might be that the testing dataset has fewer observations than the training dataset. Also, I might just be lucky on choosing my random seed. 
+
+
+
+
+
+
+
+
+
