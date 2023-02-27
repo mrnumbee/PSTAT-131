@@ -1,0 +1,102 @@
+---
+title: "PROJECT"
+author: "Victor Zhang"
+date: "2023-02-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ggplot2)
+library(corrplot)
+library(ggthemes)
+library(kableExtra)
+library(kknn)
+library(parsnip)
+library(tune)
+library(glmnet)
+library(modeldata)
+library(naniar)
+library(themis)
+
+tidymodels_prefer()
+
+```
+
+
+```{r}
+
+
+basic_info = read.csv('/Users/victo/Desktop/data/2/steam.csv')
+tag_data = read.csv('/Users/victo/Desktop/data/2/steamspy_tag_data.csv')
+
+```
+
+
+
+
+
+
+
+
+```{r}
+
+
+
+f <- basic_info %>% 
+  filter(type == "game" & 	release_date >= 2021)
+
+
+ff <- f %>% 
+  mutate(estiamted_sales = c(total_positive + total_negative)) %>% 
+  select(appid, estiamted_sales, price) %>% 
+  filter(estiamted_sales >= 100)
+
+
+test <- merge(ff, tag_data)
+
+test <-  test %>%  drop_na()
+
+
+summary(test$estiamted_sales)
+
+test2 <- test %>% 
+  select_if(colSums(test)>40000)  %>% 
+  select(-c(early_access)) %>% 
+  mutate(sales_index = if_else(estiamted_sales <= 1126, "bad", "good")) %>% 
+  select(appid, estiamted_sales, sales_index, everything()) 
+    
+dim(test2)
+
+
+```
+
+
+
+```{r}
+
+
+test2 %>% 
+  select(is.numeric) %>% 
+  cor() %>% 
+  corrplot(type = 'lower', diag = FALSE, 
+           method = 'color',tl.cex = 0.7)
+
+```
+
+
+
+
+
+
+
+
+
