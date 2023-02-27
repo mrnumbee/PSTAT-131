@@ -1,0 +1,356 @@
+---
+title: "Homework 4"
+author: "Victor Zhang"
+date: "2023-02-27"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+
+## Question 1:
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ggplot2)
+library(corrplot)
+library(ggthemes)
+library(kableExtra)
+tidymodels_prefer()
+
+```
+
+
+
+```{r}
+abalone = read.csv('/Users/victo/Desktop/dataa/abalone.csv')
+abalone_new <- abalone %>%
+  mutate(age = rings + 1.5) %>% 
+  select(age, rings, everything())
+
+set.seed(2333)
+
+abalone_split <- initial_split(abalone_new, prop = 0.80, strata = age)
+abalone_train <- training(abalone_split)
+abalone_test <- testing(abalone_split)
+
+abalone_folds <- vfold_cv(abalone_train, v = 5)
+abalone_folds
+
+
+abalone_train_1 <- abalone_train[-2]
+
+abalone_test_1 <- abalone_test[-2]
+
+abalone_recipe <- recipe(age ~ ., data = abalone_train_1) %>% 
+  step_dummy(all_nominal_predictors())   %>% 
+  step_interact(terms = ~ starts_with("type"):shucked_weight) %>% 
+  step_interact(terms = ~ longest_shell:diameter) %>% 
+  step_interact(terms = ~ shucked_weight:shell_weight) %>% 
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors())
+
+
+```
+
+## Question 2
+
+Cross-validation is a resampling process, and it has a parameter called k that refers to the number of groups that a given data sample is to be split into,
+
+Because it generally gives a less biased or less optimistic estimate of the model skill than other methods.
+
+We are using validation set approach.
+
+
+
+## Question 3
+
+```{r}
+library(kknn)
+
+lm_mod <- linear_reg() %>%
+  set_mode("regression") %>%
+  set_engine("lm")
+
+lm_wkflow <- workflow() %>% 
+  add_model(lm_mod) %>% 
+  add_recipe(abalone_recipe)
+
+knn_mod_cv <- nearest_neighbor(neighbors = tune()) %>%
+  set_mode("regression") %>%
+  set_engine("kknn")
+
+knn_wkflow_cv <- workflow() %>% 
+  add_model(knn_mod_cv) %>% 
+  add_recipe(abalone_recipe)
+
+en_abalone <- linear_reg(mixture = tune(), 
+                              penalty = tune()) %>%
+  set_mode("regression") %>%
+  set_engine("glmnet")
+
+en_workflow_abalone <- workflow() %>% 
+  add_recipe(abalone_recipe) %>% 
+  add_model(en_abalone)
+
+```
+
+
+
+
+```{r}
+library(parsnip)
+library(tune)
+
+
+neighbors_grid <- grid_regular(neighbors(range = c(1, 10)), levels = 10)
+en_grid <- grid_regular(penalty(),mixture(range = c(0, 1)),levels = 10)
+
+```
+
+
+10 models for knn, 100 models for elastic net linear regression.
+
+
+## Question 4
+
+
+```{r}
+library(glmnet)
+library(modeldata)
+library(naniar)
+library(themis)
+
+lm_tune_res <- lm_wkflow %>% 
+  fit_resamples(resamples = abalone_folds)
+
+knn_tune_res <- tune_grid(
+  object = knn_wkflow_cv, 
+  resamples = abalone_folds, 
+  grid = neighbors_grid
+)
+
+en_tune_res <- tune_grid(
+  en_workflow_abalone,
+  resamples = abalone_folds, 
+  grid = en_grid
+)
+
+
+
+```
+
+
+## Question 5
+
+
+
+```{r R.options=list(pillar.sigfig = 5)}
+
+
+collect_metrics(knn_tune_res)
+show_best(knn_tune_res, metric = "rmse")
+select_by_one_std_err(knn_tune_res, desc(neighbors), metric = "rmse")
+
+collect_metrics(en_tune_res)
+show_best(en_tune_res, metric = "rmse")
+select_by_one_std_err(en_tune_res, metric = "rmse", penalty, mixture)
+
+
+collect_metrics(lm_tune_res)
+show_best(lm_tune_res, metric = "rmse")
+
+
+```
+
+
+Overall, the linear model has performed the best because it has the lowest RMSE among all models.
+
+
+## Question 6
+
+```{r}
+
+best <- show_best(lm_tune_res, metric = "rmse")
+
+final_wf <- finalize_workflow(lm_wkflow, best)
+
+final_fit <- fit(final_wf, abalone_train_1)
+
+augment(final_fit, new_data = abalone_test_1) %>%
+  rmse(truth = age, estimate = .pred)
+
+
+```
+
+My model’s testing RMSE is lower than its average RMSE across folds.
+
+## Question 7
+
+```{r}
+
+titanic = read.csv('/Users/victo/Desktop/New folder/data/titanic.csv')
+titanic$survived <- factor(titanic$survived, levels = c("Yes","No"))
+titanic$pclass<- as.factor(titanic$pclass)
+
+is.factor(titanic$survived)
+is.factor(titanic$pclass)
+levels(titanic$survived)
+
+
+titanic_split <- initial_split(titanic, prop = 0.7,
+                                strata = survived)
+
+titanic_train <- training(titanic_split)
+titanic_test <- testing(titanic_split)
+
+titanic_folds <- vfold_cv(titanic_train, v = 5)
+
+
+```
+
+## Question 8
+
+```{r}
+
+titanic_recipe <- recipe(survived ~ pclass + sex + age + sib_sp + parch + fare, data = titanic_train) %>% 
+  step_upsample(survived, over_ratio = 1, skip = TRUE) %>% 
+  step_impute_linear(age, impute_with = imp_vars(pclass, sex, sib_sp, parch, fare)) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_interact(terms = ~ starts_with("sex"):fare) %>% 
+  step_interact(terms = ~ age:fare)
+
+prep(titanic_recipe) %>% bake(new_data = titanic_train) %>% 
+  group_by(survived) %>% 
+  summarise(count = n())
+```
+
+## Question 9
+
+```{r}
+
+t_knn_mod <- nearest_neighbor(neighbors = tune()) %>%
+  set_mode("classification") %>%
+  set_engine("kknn")
+
+t_knn_wkflow <- workflow() %>% 
+  add_model(t_knn_mod) %>% 
+  add_recipe(titanic_recipe)
+
+
+log_reg <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+
+t_log_wkflow <- workflow() %>% 
+  add_model(log_reg) %>% 
+  add_recipe(titanic_recipe)
+
+
+t_en_titanic <- logistic_reg(mixture = tune(), 
+                              penalty = tune()) %>%
+  set_mode("classification") %>%
+  set_engine("glmnet")
+
+t_en_workflow_titanic <- workflow() %>% 
+  add_recipe(titanic_recipe) %>% 
+  add_model(t_en_titanic)
+
+neighbors_grid <- grid_regular(neighbors(range = c(1, 10)), levels = 10)
+en_grid <- grid_regular(penalty(),mixture(range = c(0, 1)),levels = 10)
+
+```
+
+
+
+## Question 10
+
+
+```{r}
+
+t_log_tune_res <- t_log_wkflow %>% 
+  fit_resamples(resamples = titanic_folds)
+
+t_knn_tune_res <- tune_grid(
+  object = t_knn_wkflow, 
+  resamples = titanic_folds, 
+  grid = neighbors_grid
+)
+
+t_en_tune_res <- tune_grid(
+  t_en_workflow_titanic,
+  resamples = titanic_folds, 
+  grid = en_grid
+)
+
+
+
+```
+
+## Question 11
+
+```{r R.options=list(pillar.sigfig = 5)}
+collect_metrics(t_knn_tune_res)
+show_best(t_knn_tune_res, metric = "roc_auc")
+select_by_one_std_err(t_knn_tune_res, desc(neighbors), metric = "roc_auc")
+
+collect_metrics(t_en_tune_res)
+show_best(t_en_tune_res, metric = "roc_auc")
+select_by_one_std_err(t_en_tune_res, metric = "roc_auc", penalty, mixture)
+
+
+collect_metrics(t_log_tune_res)
+show_best(t_log_tune_res, metric = "roc_auc")
+
+
+```
+
+Elastic net logistic regression with penalty = 1e-10 and mixture = 0 has performed the best because it has the highest area under the ROC curve among all models.
+
+
+## Question 12
+
+
+
+```{r}
+
+t_best <- select_by_one_std_err(t_en_tune_res, metric = "roc_auc", penalty, mixture)
+
+
+t_final_wf <- finalize_workflow(t_en_workflow_titanic, t_best)
+
+t_final_fit <- fit(t_final_wf, titanic_train)
+
+augment(t_final_fit, new_data = titanic_test) %>%
+  roc_auc(truth = survived, estimate = .pred_Yes)
+
+
+```
+
+
+My model’s testing ROC AUC is lower than its average ROC AUC across folds.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
