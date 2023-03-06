@@ -77,6 +77,7 @@ test2 <- test %>%
 dim(test2)
 
 
+
 ```
 
 
@@ -96,7 +97,19 @@ test2 %>%
 
 
 
+```{r}
 
 
+test3 <- test2
 
+for(i in 4:ncol(test3)) {
+  for(j in 1:nrow(test3)){
+    
+  if (test3[j,i] >= 1){
+    test3[j,i] <- 1
+    } 
+}
+}
+
+```
 
