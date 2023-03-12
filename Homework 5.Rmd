@@ -1,0 +1,311 @@
+---
+title: "Homework 5"
+author: "Victor Zhang"
+date: "2023-03-11"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE,
+                      warning = FALSE)
+```
+
+## Exercise 1
+
+```{r}
+library(ggplot2)
+library(kableExtra)
+library(tidymodels)
+library(tidyverse)
+library(glmnet)
+library(modeldata)
+library(ggthemes)
+library(janitor)
+library(naniar) 
+library(corrplot) 
+library(themis) 
+tidymodels_prefer()
+library(xgboost)
+library(ranger)
+library(vip)
+```
+
+```{r}
+
+pokemon <- read.csv('/Users/victo/Desktop/data/Pokemon.csv')
+
+pokemon <- pokemon %>% 
+  clean_names()
+head(pokemon)
+
+```
+
+
+All columns turn into snake case (all words start with lowercase letters and are separated by underscores, which makes them look_like_little_snakes). When we download data, the column names (variable names) may not all be in the same case or in a case that aren’t easy to work with. It can be helpful to change all column names so that they follow one universal naming convention. 
+
+
+
+
+## Exercise 2
+
+```{r}
+pokemon %>% 
+  ggplot(aes(x = type_1)) + geom_bar() +
+  theme_bw()
+
+```
+
+There are 18 classes of the outcome. Some classes like flying, fairy, and ice have only few pokemon, especially the flying class.
+
+```{r}
+
+pokemon$type_1 <- as.factor(pokemon$type_1)
+pokemon$legendary  <- as.factor(pokemon$legendary )
+pokemon$generation  <- as.factor(pokemon$generation )
+
+pokemon2 <- pokemon
+pokemon2$type_1 <- fct_lump_n(
+  pokemon$type_1,
+  6,
+  w = NULL,
+  other_level = "Other",
+  ties.method = c("min", "average", "first", "last", "random", "max")
+)
+
+```
+
+## Exercise 3
+
+```{r}
+set.seed(2333)
+
+abalone_split <- initial_split(pokemon2, prop = 0.80, strata = type_1)
+
+pokemon2_train <- training(abalone_split)
+pokemon2_test <- testing(abalone_split)
+
+dim(pokemon2_test)
+dim(pokemon2_train)
+
+pokemon2_folds <- vfold_cv(pokemon2_train, v = 5, strata = type_1)
+
+```
+
+Because it ensures the training and test sets have the same proportion of the feature of interest as in the original dataset.
+
+
+## Exercise 4
+
+```{r}
+
+
+pokemon2 <- pokemon2 %>% 
+  mutate(legendary_2 = case_when(legendary == "False" ~ "0", 
+                                legendary == "True" ~ "1")) 
+
+
+pokemon2$legendary_2 <- as.numeric(pokemon2$legendary_2)
+
+pokemon2 %>% 
+  select(is.numeric) %>% 
+  cor() %>%
+  corrplot(type = "lower", diag = FALSE)
+
+```
+
+For the categorical variable legendary that indicates whether a pokemon is a legendary pokemon or not, I mutate a new column legendary_2 that has value 1 if legendary has value Ture, and value 0 if legendary has value False. Thus, I can include the legendary status in the correlation matrix. 
+
+I notice that all special statues are positively correlated with each other, all status is positively correlated with the variable "total" (the sum of all status), and generation is positively correlated with pokemon ID or index in the data. Also, legendary pokemon tend to have a better status than non-legendary pokemon.
+
+
+
+## Exercise 5
+
+```{r}
+
+pokemon2_recipe <- recipe(type_1  ~ legendary + generation + sp_atk + attack + speed + defense + hp + sp_def, data = pokemon2_train) %>% 
+  step_dummy(legendary, generation) %>% 
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors())
+
+
+```
+
+
+## Exercise 6
+
+```{r}
+
+multinom_reg_mod <- multinom_reg(mixture = tune(), 
+                              penalty = tune()) %>%
+  set_mode("classification") %>%
+  set_engine("glmnet")
+
+multinom_reg_grid <- grid_regular(penalty(range = c(0.01, 3),
+                                          trans = identity_trans()),
+                                  mixture(range = c(0, 1)),
+                                  levels = 10)
+
+
+multinom_reg_workflow <- workflow() %>% 
+  add_recipe(pokemon2_recipe) %>% 
+  add_model(multinom_reg_mod)
+
+```
+
+
+
+## Exercise 7
+
+```{r}
+
+
+rf_mod <- rand_forest(mtry = tune(), 
+                           trees = tune(), 
+                           min_n = tune()) %>%
+  set_engine("ranger", importance = "impurity") %>% 
+  set_mode("classification")
+
+rf_wf <- workflow() %>% 
+  add_recipe(pokemon2_recipe) %>% 
+  add_model(rf_mod)
+
+rf_grid <- grid_regular(mtry(range = c(1, 8)), 
+                        trees(range = c(1, 8)),
+                        min_n(range = c(1, 8)),
+                        levels = 8)
+```
+
+
+mtry is an integer for the number of predictors that will be randomly sampled at each split when creating the tree models. Since we have 8 predictors in total and 1 response variable, mtry is bounded by the total number of predictors, which is 8, and the minimum number of predictors that the regression process needs to produce a meaningful result, which is 1.
+
+
+
+## Exercise 8
+
+
+multinom_reg_mod_res <- tune_grid(
+  multinom_reg_workflow,
+  resamples = pokemon2_folds,
+  grid = multinom_reg_grid
+)
+
+
+
+
+rf_res <- tune_grid(
+  rf_wf,
+  resamples = pokemon2_folds,
+  grid = rf_grid
+)
+
+
+
+save(multinom_reg_mod_res, file = "multinom_reg_mod_res.rda")
+save(rf_res, file = "rf_res.rda")
+
+
+
+
+```{r}
+load("C:/Users/victo/Documents/PSTAT-131/rf_res.rda")
+load("C:/Users/victo/Documents/PSTAT-131/multinom_reg_mod_res.rda")
+```
+
+
+```{r}
+autoplot(multinom_reg_mod_res) + theme_minimal()
+```
+
+
+```{r}
+
+autoplot(rf_res) + theme_minimal()
+
+```
+
+
+```{r}
+show_best(multinom_reg_mod_res, n = 1)
+best_multinom_reg<- select_best(multinom_reg_mod_res)
+
+```
+
+
+```{r}
+show_best(rf_res, n = 1)
+best_rf <- select_best(rf_res)
+
+```
+
+The smaller values of penalty and mixture produce better ROC AUC.
+The best one is the one that has penalty 0.01 and mixture 0.6666667.
+
+
+The larger values of min_n, trees, and mtry produce better ROC AUC.
+The best one is the one that has mtry 5, trees 7, and min_n 5.
+
+## Exercise 9
+
+```{r}
+final_rf_model <- finalize_workflow(rf_wf, best_rf)
+final_rf_model <- fit(final_rf_model, pokemon2_train)
+
+final_rf_model %>% extract_fit_parsnip() %>% 
+  vip() +
+  theme_minimal()
+```
+
+
+```{r}
+
+final_rf_model_test <- augment(final_rf_model, 
+                               pokemon2_test) %>% 
+  select(type_1, starts_with(".pred"))
+
+roc_auc(final_rf_model_test, truth = type_1, .pred_Bug:.pred_Other
+)
+
+
+roc_curve(final_rf_model_test, truth = type_1, .pred_Bug:.pred_Other) %>% 
+  autoplot()
+```
+
+```{r}
+
+conf_mat(final_rf_model_test, truth = type_1, 
+         .pred_class) %>% 
+  autoplot(type = "heatmap")
+
+
+```
+
+
+
+## Exercise 10
+
+
+```{r}
+```
+
+My best random forest model did ok on the testing set with roc_auc of 0.6400572.
+
+The model is best at predicting the other types of pokemon, and is worst at predicting the water types of pokemon.
+
+One reason might be that the testing dataset has too few observation.
+
+
+
+
+
+
+
+
+
+
+
+
